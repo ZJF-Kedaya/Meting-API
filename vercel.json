@@ -1,9 +1,7 @@
 {
-    "git": {
-        "deployment enabled": false
-    },
     "env": {
-        "RUNTIME": "vercel"
+        "RUNTIME": "vercel",
+        "OVERSEAS": "0"
     },
     "rewrites": [
         {
