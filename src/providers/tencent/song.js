@@ -1,6 +1,9 @@
 import { changeUrlQuery } from "./util.js"
 import config from "../../config.js"
 
+// 代理地址
+const PROXY_URL = 'https://proxy.kedaya.gq';
+
 export const get_song_url = async (id, cookie = '') => {
 
     id = id.split(',')
@@ -21,7 +24,6 @@ export const get_song_url = async (id, cookie = '') => {
             module: 'vkey.GetVkeyServer',
             method: 'CgiGetVkey',
             param: {
-                // filename: file,
                 guid: guid,
                 songmid: id,
                 songtype: [0],
@@ -58,17 +60,19 @@ export const get_song_url = async (id, cookie = '') => {
         const callback_function_name = 'callback'
         const callback_name = "callback"
         const parse_function = "qq_get_url_from_json"
-        const url = changeUrlQuery(params, 'https://u.y.qq.com/cgi-bin/musicu.fcg')
-        return "@" + parse_function + '@' + callback_name + '@' + callback_function_name + '@' + url
+        const originalUrl = changeUrlQuery(params, 'https://u.y.qq.com/cgi-bin/musicu.fcg')
+        // 使用代理
+        return "@" + parse_function + '@' + callback_name + '@' + callback_function_name + '@' + `${PROXY_URL}?url=${encodeURIComponent(originalUrl)}`
     }
 
 
-    const url = changeUrlQuery(params, 'https://u.y.qq.com/cgi-bin/musicu.fcg')
+    const originalUrl = changeUrlQuery(params, 'https://u.y.qq.com/cgi-bin/musicu.fcg')
+    // 使用代理
+    const url = `${PROXY_URL}?url=${encodeURIComponent(originalUrl)}`;
 
     let result = await fetch(url);
 
     result = await result.json()
-    // console.log(result)
     if (result.req_0 && result.req_0.data && result.req_0.data.midurlinfo) {
         purl = result.req_0.data.midurlinfo[0].purl;
     }
@@ -78,7 +82,6 @@ export const get_song_url = async (id, cookie = '') => {
         result.req_0.data.sip[0];
 
     const res = `${domain}${purl}`.replace('http://', 'https://')
-    // console.log(res);
     return res;
 
 }
@@ -96,7 +99,9 @@ export const get_song_info = async (id, cookie = '') => {
         }),
     };
 
-    const url = changeUrlQuery(data, 'http://u.y.qq.com/cgi-bin/musicu.fcg');
+    const originalUrl = changeUrlQuery(data, 'http://u.y.qq.com/cgi-bin/musicu.fcg');
+    // 使用代理
+    const url = `${PROXY_URL}?url=${encodeURIComponent(originalUrl)}`;
 
     let result = await fetch(url);
 
@@ -112,7 +117,6 @@ export const get_song_info = async (id, cookie = '') => {
         lrc: id,
         songmid: id,
     }
-    // console.log(song_info)
     return [song_info]
 }
 
@@ -120,12 +124,3 @@ export const get_pic = async (id, cookie = '') => {
     const info = await get_song_info(id, cookie)
     return info[0].pic
 }
-
-// const res = await get_song_url('002Rnpvi058Qdm');
-// console.log(res)
-
-// const res = await get_song_url('002Rnpvi058Qdm,000i26Sh1ZyiNU');
-// console.log(res)
-
-// const res = await get_song_info('002Rnpvi058Qdm');
-// console.log(res)
