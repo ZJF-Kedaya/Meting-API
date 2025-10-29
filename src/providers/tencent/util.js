@@ -15,7 +15,6 @@ function getQueryFromUrl(key, search) {
         });
         return key ? result[key] : result;
     } catch (err) {
-        // 除去search为空等异常
         return key ? '' : {};
     }
 }
