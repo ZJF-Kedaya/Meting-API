@@ -2,7 +2,7 @@ import { changeUrlQuery } from "./util.js"
 import config from "../../config.js"
 
 // 代理地址
-const PROXY_URL = 'https://proxy.kedaya.gq';
+const PROXY_URL = 'https://proxy.kedaya.gq/';
 
 export const get_song_url = async (id, cookie = '') => {
 
