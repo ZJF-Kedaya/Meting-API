@@ -7,7 +7,7 @@ if (['cloudflare', 'vercel'].includes(runtime)) OVERSEAS = true
 
 const PORT = globalThis?.Deno?.env?.get("PORT") || globalThis?.process?.env?.PORT || 3000
 
-OVERSEAS = Boolean(OVERSEAS)
+OVERSEAS = -1
 
 export default {
     OVERSEAS,
