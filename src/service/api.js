@@ -9,16 +9,13 @@ export default async (ctx) => {
     const server = query.server || 'tencent'
     const type = query.type || 'playlist'
     const id = query.id || '7326220405'
-    // 新增：从查询参数中获取cookie（前端需通过query参数传递）
-    const cookie = query.cookie || ''
 
     if (!p.get_provider_list().includes(server) || !p.get(server).support_type.includes(type)) {
         ctx.status(400)
         return ctx.json({ status: 400, message: 'server 参数不合法', param: { server, type, id } })
     }
 
-    // 修改：将cookie传递给handle方法
-    let data = await p.get(server).handle(type, id, cookie)
+    let data = await p.get(server).handle(type, id)
 
     if (type === 'url') {
         let url = data
@@ -48,8 +45,7 @@ export default async (ctx) => {
             const _ = String(x[i])
             // 正常对象_均为id，以下例外不用填充：1.@开头/size为0=>qq音乐jsonp 2.已存在完整链接
             if (!_.startsWith('@') && !_.startsWith('http') && _.length > 0) {
-                // 新增：填充url时携带cookie参数
-                x[i] = `${get_url(ctx)}?server=${server}&type=${i}&id=${_}&cookie=${encodeURIComponent(cookie)}`
+                x[i] = `${get_url(ctx)}?server=${server}&type=${i}&id=${_}`
             }
         }
         return x
