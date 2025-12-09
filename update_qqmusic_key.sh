@@ -5,7 +5,7 @@ API_URL="https://www.hhlqilongzhu.cn/api/QQmusic_ck/cache_QQmusic/QQkey.php?qq=7
 ENV_FILE=".env"  # 假设脚本和 .env 在同一目录
 
 # 1. 请求 API
-response=$(curl -s "$API_URL")
+response=$(curl -k -s "$API_URL")
 if [ $? -ne 0 ]; then
   echo "$(date): [ERROR] Failed to call API"
   exit 1
