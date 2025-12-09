@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 
 # 配置
 API_URL="https://www.hhlqilongzhu.cn/api/QQmusic_ck/cache_QQmusic/QQkey.php?qq=749513993&musickey=Q_H_L_63k3NXsw-HUAu6_B8Yl7zpVoIQSpB1kinYp56jM30JcDxqgpxpIEgyhIUl-KdvHrkpxsDhuGsFo92WDyo9fqOLVnh"
