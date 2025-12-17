@@ -9,25 +9,18 @@ on:
   pull_request:
     branches:
       - master
-  # === 新增：定时触发 ===
-  schedule:
-    - cron: "0 3 * * *"   # 每天 UTC 3:00（北京时间 11:00）
-  # 允许手动触发（可选）
-  workflow_dispatch:
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: ${{ github.repository }}
 
 jobs:
-  # === 原有 Job：构建和推送 Docker 镜像 ===
   build-and-push:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    # 仅在 push 或 PR 时运行（避免 schedule 触发它）
-    if: github.event_name == 'push' || github.event_name == 'pull_request'
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -66,37 +59,3 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
           platforms: linux/amd64,linux/arm64
-
-  # === 新增 Job：每天自动更新 qqmusic_key ===
-  auto-update-qqmusic-key:
-    runs-on: ubuntu-latest
-    permissions:
-      contents: write  # 需要写权限来提交 .env
-    # 仅在 schedule 或手动触发时运行
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Make script executable
-        run: chmod +x update_qqmusic_key.sh
-
-      - name: Install jq (required by script)
-        run: sudo apt-get update && sudo apt-get install -y jq
-
-      - name: Run update_qqmusic_key.sh
-        run: ./update_qqmusic_key.sh
-
-      - name: Commit and push .env if changed
-        run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
-          git add .env
-          if ! git diff --cached --quiet; then
-            git commit -m "[Auto] Update qqmusic_key $(date -u)"
-            git push
-          else
-            echo "No changes to .env"
-          fi
