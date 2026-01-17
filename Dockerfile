@@ -12,5 +12,7 @@ COPY . /app
 
 RUN yarn
 
+RUN chmod +x /app/update_qqmusic_key.sh
+
 EXPOSE 80 443
 ENTRYPOINT ["node", "src/index.js"]
