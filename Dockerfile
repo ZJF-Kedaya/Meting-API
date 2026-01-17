@@ -14,5 +14,7 @@ RUN yarn
 
 RUN chmod +x /app/update_qqmusic_key.sh
 
+RUN echo "0 0,12 * * * $(pwd)/update_qqmusic_key.sh" >> /var/spool/cron/$(whoami)
+
 EXPOSE 80 443
 ENTRYPOINT ["node", "src/index.js"]
