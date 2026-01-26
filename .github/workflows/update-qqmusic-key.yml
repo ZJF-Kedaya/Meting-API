@@ -1,0 +1,38 @@
+name: Update QQ Music Key Daily
+
+on:
+  schedule:
+    - cron: '0 0 * * *'  # 每天 UTC 00:00 执行（北京时间 08:00）
+  workflow_dispatch:      # 允许手动触发
+
+jobs:
+  update-key:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Make script executable
+        run: chmod +x ./update_qqmusic_key.sh
+
+      - name: Install dependencies (jq, curl)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y jq curl
+
+      - name: Run update script
+        run: ./update_qqmusic_key.sh
+
+      - name: Commit and push if changed
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+
+          if ! git diff --quiet; then
+            git add .
+            git commit -m "chore: auto-update QQ music key [$(date -u)]"
+            git push
+          else
+            echo "No changes detected. Skipping commit."
+          fi
