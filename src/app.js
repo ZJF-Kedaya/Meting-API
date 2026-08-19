@@ -6,9 +6,11 @@ import apiService from './service/api.js'
 import demoService from './service/demo.js'
 import config from './config.js'
 
-// 构建 Hono 应用实例（不含服务器启动逻辑）
-// 该模块被 src/index.js（Docker / 本地 Node 服务）与 api/index.js（Vercel 函数）共用
-const app = new Hono()
+// 应用实例：只组装路由与中间件，不启动服务。
+// - 本地 / Docker 由 src/index.js 调用 serve() 启动
+// - Vercel 由 api/index.js 通过 @hono/node-server/vercel 适配
+// strict: false —— 让 /api 与 /api/（尾斜杠）等价，兼容 Vercel 上访问 /api/?xxx 的形式
+const app = new Hono({ strict: false })
   .use(requestLogger)
   .use(cors())
   .use(errors)
@@ -16,8 +18,8 @@ const app = new Hono()
 app.get(`${config.http.prefix}/api`, apiService)
 app.get(`${config.http.prefix}/demo`, demoService)
 
-// Vercel 兼容：将 demo 页同时挂在 /api/demo 下，
-// 配合 vercel.json 的 rewrite（/demo -> /api/demo）使 Vercel 上也能访问演示页
+// Vercel 兼容：Serverless 函数挂在 /api 下，/api/demo 供 vercel.json 的 rewrite 使用，
+// 使根路径 /demo 在 Vercel 上同样可用
 app.get('/api/demo', demoService)
 
 export default app
