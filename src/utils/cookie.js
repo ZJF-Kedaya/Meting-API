@@ -26,7 +26,9 @@ async function startWatcher () {
 }
 
 // 启动监听（仅启动一次）
-if (!watcher) {
+// Vercel 等无状态 Serverless 环境：文件系统只读、无需监听文件变化，
+// 且保持事件循环活跃会影响实例回收，因此跳过
+if (!watcher && !process.env.VERCEL) {
   startWatcher().catch(() => {})
 }
 

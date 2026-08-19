@@ -9,7 +9,12 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "lint": "eslint ."
+    "lint": "eslint .",
+    "vercel:dev": "vercel dev",
+    "deploy:vercel": "vercel --prod"
+  },
+  "engines": {
+    "node": ">=22"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.7",
