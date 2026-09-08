@@ -22,32 +22,52 @@ const METING_METHODS = {
 }
 
 // QQ 音乐搜索：@meting/core 仍用已废弃的 client_search_cp(GET)，现返回 500。
-// 改用 PC 端 musicu.fcg 的 DoSearchForQQMusicDesktop(POST)，无需 sign，返回原生 songmid。
-// 这样后续 type=url/pic/lrc 仍走 tencent（带 VIP cookie），拿到的是可播放的 QQ 音乐链接。
+// 改用 musicu.fcg 的 DoSearchForQQMusicDesktop(POST)，返回原生 songmid，
+// 后续 type=url/pic/lrc 仍走 tencent（带 VIP cookie），拿到可播放的 QQ 音乐链接。
+// 注意：请求里的 uin/searchid 必须每次随机——QQ 风控按该维度限流(code 2001)，
+// 固定值连发必被拉黑；随机化后稳定返回 code 0（2026-09 实测）。
+const rndDigits = n => Array.from({ length: n }, () => Math.floor(Math.random() * 10)).join('')
+
 const TENCENT_SEARCH_HEADERS = {
-  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
   Referer: 'https://y.qq.com/',
   'Content-Type': 'application/json'
 }
 
 async function tencentSearch (keyword, page = 1, limit = 30) {
   const body = {
-    'music.search.SearchCgiService': {
+    comm: {
+      g_tk: 5381,
+      uin: rndDigits(10),
+      format: 'json',
+      inCharset: 'utf-8',
+      outCharset: 'utf-8',
+      notice: 0,
+      platform: 'h5',
+      needNewCode: 1,
+      ct: 23,
+      cv: 0
+    },
+    req_0: {
       method: 'DoSearchForQQMusicDesktop',
       module: 'music.search.SearchCgiService',
       param: {
-        num_per_page: limit,
-        page_num: page,
+        remoteplace: 'txt.mqq.all',
+        searchid: rndDigits(18),
+        search_type: 0,
         query: keyword,
-        search_type: 0
+        page_num: page,
+        num_per_page: limit
       }
     }
   }
+  // _webcgikey + 时间戳参数为 PC 客户端请求形态，风控通过率更高
+  const url = `https://u.y.qq.com/cgi-bin/musicu.fcg?_webcgikey=DoSearchForQQMusicDesktop&_=${Date.now()}`
   let lastErr
   // 上游偶发限流(code 2001)/网络抖动，轻量重试 3 次
   for (let attempt = 0; attempt < 3; attempt++) {
     try {
-      const resp = await fetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
+      const resp = await fetch(url, {
         method: 'POST',
         headers: TENCENT_SEARCH_HEADERS,
         body: JSON.stringify(body)
@@ -56,7 +76,7 @@ async function tencentSearch (keyword, page = 1, limit = 30) {
         throw new Error(`HTTP ${resp.status}`)
       }
       const j = await resp.json()
-      const svc = j['music.search.SearchCgiService']
+      const svc = j.req_0
       if (!svc || svc.code !== 0) {
         throw new Error(`code ${svc ? svc.code : 'unknown'}`)
       }
