@@ -45,17 +45,20 @@ export default async (c) => {
   }
 
   // 4. 调用 API
-  const cacheKey = `${server}/${type}/${id}`
+  // QQ音乐搜索接口已失效：上游改为需 sign + 动态 searchid 加密，@meting/core 尚未适配，
+  // 故对 tencent + search 降级到 netease 搜索兜底。返回字段与现有 map 完全一致，可直接播放。
+  const effectiveServer = type === 'search' && server === 'tencent' ? 'netease' : server
+  const cacheKey = `${effectiveServer}/${type}/${id}`
   let data = cache.get(cacheKey)
   if (data === undefined) {
     c.header('x-cache', 'miss')
-    const meting = new Meting(server)
+    const meting = new Meting(effectiveServer)
     meting.format(true)
 
     // 检查 referrer 并配置 cookie
     const referrer = c.req.header('referer')
     if (isAllowedHost(referrer)) {
-      const cookie = await readCookieFile(server)
+      const cookie = await readCookieFile(effectiveServer)
       if (cookie) {
         meting.cookie(cookie)
       }
@@ -126,9 +129,9 @@ export default async (c) => {
     return {
       title: x.name,
       author: x.artist.join(' / '),
-      url: `${config.meting.url}/api?server=${server}&type=url&id=${x.url_id}&auth=${auth(server, 'url', x.url_id)}`,
-      pic: `${config.meting.url}/api?server=${server}&type=pic&id=${x.pic_id}&auth=${auth(server, 'pic', x.pic_id)}`,
-      lrc: `${config.meting.url}/api?server=${server}&type=lrc&id=${x.lyric_id}&auth=${auth(server, 'lrc', x.lyric_id)}`
+      url: `${config.meting.url}/api?server=${effectiveServer}&type=url&id=${x.url_id}&auth=${auth(effectiveServer, 'url', x.url_id)}`,
+      pic: `${config.meting.url}/api?server=${effectiveServer}&type=pic&id=${x.pic_id}&auth=${auth(effectiveServer, 'pic', x.pic_id)}`,
+      lrc: `${config.meting.url}/api?server=${effectiveServer}&type=lrc&id=${x.lyric_id}&auth=${auth(effectiveServer, 'lrc', x.lyric_id)}`
     }
   }))
 }
