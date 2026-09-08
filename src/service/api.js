@@ -21,6 +21,65 @@ const METING_METHODS = {
   pic: 'pic'
 }
 
+// QQ 音乐搜索：@meting/core 仍用已废弃的 client_search_cp(GET)，现返回 500。
+// 改用 PC 端 musicu.fcg 的 DoSearchForQQMusicDesktop(POST)，无需 sign，返回原生 songmid。
+// 这样后续 type=url/pic/lrc 仍走 tencent（带 VIP cookie），拿到的是可播放的 QQ 音乐链接。
+const TENCENT_SEARCH_HEADERS = {
+  'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+  Referer: 'https://y.qq.com/',
+  'Content-Type': 'application/json'
+}
+
+async function tencentSearch (keyword, page = 1, limit = 30) {
+  const body = {
+    'music.search.SearchCgiService': {
+      method: 'DoSearchForQQMusicDesktop',
+      module: 'music.search.SearchCgiService',
+      param: {
+        num_per_page: limit,
+        page_num: page,
+        query: keyword,
+        search_type: 0
+      }
+    }
+  }
+  let lastErr
+  // 上游偶发限流(code 2001)/网络抖动，轻量重试 3 次
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const resp = await fetch('https://u.y.qq.com/cgi-bin/musicu.fcg', {
+        method: 'POST',
+        headers: TENCENT_SEARCH_HEADERS,
+        body: JSON.stringify(body)
+      })
+      if (!resp.ok) {
+        throw new Error(`HTTP ${resp.status}`)
+      }
+      const j = await resp.json()
+      const svc = j['music.search.SearchCgiService']
+      if (!svc || svc.code !== 0) {
+        throw new Error(`code ${svc ? svc.code : 'unknown'}`)
+      }
+      const list = (svc.data && svc.data.body && svc.data.body.song && svc.data.body.song.list) || []
+      return list.map(item => ({
+        name: item.title || item.name,
+        artist: (item.singer || []).map(s => s.name),
+        // url/lyric 用 songmid；pic 走 T002R 专辑封面，需 album mid
+        url_id: item.mid,
+        pic_id: item.album && item.album.mid ? item.album.mid : item.mid,
+        lyric_id: item.mid,
+        source: 'tencent'
+      }))
+    } catch (e) {
+      lastErr = e
+      if (attempt < 2) {
+        await new Promise(r => setTimeout(r, 300 * (attempt + 1)))
+      }
+    }
+  }
+  throw lastErr
+}
+
 export default async (c) => {
   // 1. 初始化参数
   const query = c.req.query()
@@ -45,37 +104,50 @@ export default async (c) => {
   }
 
   // 4. 调用 API
-  // QQ音乐搜索接口已失效：上游改为需 sign + 动态 searchid 加密，@meting/core 尚未适配，
-  // 故对 tencent + search 降级到 netease 搜索兜底。返回字段与现有 map 完全一致，可直接播放。
-  const effectiveServer = type === 'search' && server === 'tencent' ? 'netease' : server
-  const cacheKey = `${effectiveServer}/${type}/${id}`
+  const page = Number(query.page) || 1
+  const limit = Number(query.limit) || 30
+  // tencent 搜索单独缓存（带分页），其余按 server/type/id 缓存
+  const cacheKey = type === 'search' && server === 'tencent'
+    ? `${server}/${type}/${id}/${page}/${limit}`
+    : `${server}/${type}/${id}`
   let data = cache.get(cacheKey)
   if (data === undefined) {
     c.header('x-cache', 'miss')
-    const meting = new Meting(effectiveServer)
-    meting.format(true)
+    let response
+    if (type === 'search' && server === 'tencent') {
+      // QQ 音乐原生搜索：返回 songmid，后续播放走 tencent(VIP) 链路
+      try {
+        response = await tencentSearch(id, page, limit)
+      } catch (error) {
+        throw new HTTPException(500, { message: `QQ音乐搜索接口调用失败: ${(error && error.message) || error}` })
+      }
+    } else {
+      const meting = new Meting(server)
+      meting.format(true)
 
-    // 检查 referrer 并配置 cookie
-    const referrer = c.req.header('referer')
-    if (isAllowedHost(referrer)) {
-      const cookie = await readCookieFile(effectiveServer)
-      if (cookie) {
-        meting.cookie(cookie)
+      // 检查 referrer 并配置 cookie
+      const referrer = c.req.header('referer')
+      if (isAllowedHost(referrer)) {
+        const cookie = await readCookieFile(server)
+        if (cookie) {
+          meting.cookie(cookie)
+        }
+      }
+
+      const method = METING_METHODS[type]
+      try {
+        response = await meting[method](id)
+      } catch (error) {
+        throw new HTTPException(500, { message: '上游 API 调用失败' })
+      }
+      try {
+        response = JSON.parse(response)
+      } catch (error) {
+        throw new HTTPException(500, { message: '上游 API 返回格式异常' })
       }
     }
 
-    const method = METING_METHODS[type]
-    let response
-    try {
-      response = await meting[method](id)
-    } catch (error) {
-      throw new HTTPException(500, { message: '上游 API 调用失败' })
-    }
-    try {
-      data = JSON.parse(response)
-    } catch (error) {
-      throw new HTTPException(500, { message: '上游 API 返回格式异常' })
-    }
+    data = response
     cache.set(cacheKey, data, {
       ttl: type === 'url' ? 1000 * 60 * 10 : 1000 * 60 * 60
     })
@@ -129,9 +201,9 @@ export default async (c) => {
     return {
       title: x.name,
       author: x.artist.join(' / '),
-      url: `${config.meting.url}/api?server=${effectiveServer}&type=url&id=${x.url_id}&auth=${auth(effectiveServer, 'url', x.url_id)}`,
-      pic: `${config.meting.url}/api?server=${effectiveServer}&type=pic&id=${x.pic_id}&auth=${auth(effectiveServer, 'pic', x.pic_id)}`,
-      lrc: `${config.meting.url}/api?server=${effectiveServer}&type=lrc&id=${x.lyric_id}&auth=${auth(effectiveServer, 'lrc', x.lyric_id)}`
+      url: `${config.meting.url}/api?server=${server}&type=url&id=${x.url_id}&auth=${auth(server, 'url', x.url_id)}`,
+      pic: `${config.meting.url}/api?server=${server}&type=pic&id=${x.pic_id}&auth=${auth(server, 'pic', x.pic_id)}`,
+      lrc: `${config.meting.url}/api?server=${server}&type=lrc&id=${x.lyric_id}&auth=${auth(server, 'lrc', x.lyric_id)}`
     }
   }))
 }
