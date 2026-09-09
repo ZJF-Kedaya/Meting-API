@@ -1,6 +1,7 @@
 # Meting-API
 
 基于 Hono.js 的多平台音乐 API 代理服务,封装 [@meting/core](https://www.npmjs.com/package/@meting/core) 提供的统一音乐 API。
+
 新增Vercel部署，适配QQ音乐Cookie，修复QQ音乐search接口。由于QQ音乐Cookie每三天过期，可以搭配QQ音乐保活工具[@qqmusic-keeper](https://github.com/ZJF-Kedaya/qqmusic-keeper)使用，可自动刷新Cookie并更新到Vercel环境变量。
 
 ## 特性
