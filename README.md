@@ -1,6 +1,7 @@
 # Meting-API
 
 基于 Hono.js 的多平台音乐 API 代理服务,封装 [@meting/core](https://www.npmjs.com/package/@meting/core) 提供的统一音乐 API。
+新增Vercel部署，适配QQ音乐Cookie，修复QQ音乐search接口。由于QQ音乐Cookie每三天过期，可以搭配QQ音乐保活工具[@qqmusic-keeper](https://github.com/ZJF-Kedaya/qqmusic-keeper)使用。
 
 ## 特性
 
@@ -21,6 +22,54 @@
 | 酷狗音乐 | `kugou` | - |
 | 百度音乐 | `baidu` | - |
 | 酷我音乐 | `kuwo` | - |
+
+## Vercel 部署
+
+项目内置了 Vercel Serverless Function 入口（`api/index.js`，Node.js 运行时），可直接部署，无需 Docker。
+
+### 一键部署
+
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FZJF-Kedaya%2FMeting-API)
+
+### 手动部署
+
+```bash
+# 安装依赖
+yarn install
+
+# 本地调试 Vercel 函数
+npx vercel dev
+```
+
+在 Vercel 控制台导入 Git 仓库即可，或使用 CLI:
+
+```bash
+npx vercel --prod
+```
+
+### 必配环境变量（Vercel）
+
+在 Vercel 项目 **Settings → Environment Variables** 中添加：
+
+| 变量名 | 说明 | 示例 |
+|--------|------|------|
+| `METING_URL` | 部署后的公网域名(用于生成回调 URL) | `https://your-project.vercel.app` |
+| `METING_TOKEN` | HMAC 签名密钥(敏感接口鉴权) | `your-random-secret` |
+| `METING_COOKIE_TENCENT` | **QQ音乐 Cookie**(登录态,用于获取高音质/完整数据) | `qqmusic_key=xxx; uin=xxx; ...` |
+
+> 注意:Vercel 的函数在 `api/` 目录下,部署后接口路径与本地一致:
+> - `GET https://your-project.vercel.app/api?server=tencent&type=url&id=歌曲ID&auth=token`
+> - 演示页: `https://your-project.vercel.app/demo`
+
+### 为什么用环境变量而不是 cookie 文件
+
+`cookie/` 目录下的文件会被打进部署包(仓库内已存在),但 Vercel 文件系统只读、无法在运行期更新。
+推荐使用环境变量 `METING_COOKIE_TENCENT`,并配合 `METING_COOKIE_ALLOW_HOSTS` 限制来源,避免 Cookie 被第三方滥用。
+
+### Vercel 路由说明
+
+`vercel.json` 已将 `/api/*` 与 `/demo` 重写到 `api/index.js` 函数,与本地 Docker 行为保持一致。
+
 
 ## 快速开始
 
@@ -77,53 +126,6 @@ services:
       - METING_TOKEN=your-secret-token
     restart: unless-stopped
 ```
-
-## Vercel 部署
-
-项目内置了 Vercel Serverless Function 入口（`api/index.js`，Node.js 运行时），可直接部署，无需 Docker。
-
-### 一键部署
-
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2FZJF-Kedaya%2FMeting-API)
-
-### 手动部署
-
-```bash
-# 安装依赖
-yarn install
-
-# 本地调试 Vercel 函数
-npx vercel dev
-```
-
-在 Vercel 控制台导入 Git 仓库即可，或使用 CLI:
-
-```bash
-npx vercel --prod
-```
-
-### 必配环境变量（Vercel）
-
-在 Vercel 项目 **Settings → Environment Variables** 中添加：
-
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `METING_URL` | 部署后的公网域名(用于生成回调 URL) | `https://your-project.vercel.app` |
-| `METING_TOKEN` | HMAC 签名密钥(敏感接口鉴权) | `your-random-secret` |
-| `METING_COOKIE_TENCENT` | **QQ音乐 Cookie**(登录态,用于获取高音质/完整数据) | `qqmusic_key=xxx; uin=xxx; ...` |
-
-> 注意:Vercel 的函数在 `api/` 目录下,部署后接口路径与本地一致:
-> - `GET https://your-project.vercel.app/api?server=tencent&type=url&id=歌曲ID&auth=token`
-> - 演示页: `https://your-project.vercel.app/demo`
-
-### 为什么用环境变量而不是 cookie 文件
-
-`cookie/` 目录下的文件会被打进部署包(仓库内已存在),但 Vercel 文件系统只读、无法在运行期更新。
-推荐使用环境变量 `METING_COOKIE_TENCENT`,并配合 `METING_COOKIE_ALLOW_HOSTS` 限制来源,避免 Cookie 被第三方滥用。
-
-### Vercel 路由说明
-
-`vercel.json` 已将 `/api/*` 与 `/demo` 重写到 `api/index.js` 函数,与本地 Docker 行为保持一致。
 
 ## HTTPS 配置
 
